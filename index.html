@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      input {
+        width: 100%;
+        max-width: 400px;
+        position: relative;
+      }
+      ul {
+        padding: 0;
+      }
+      li {
+        display: flex;
+        list-style: none;
+      }
+      #searchSuggestion {
+        background: #fff;
+        border: 1px solid #000;
+        display: none;
+        position: absolute;
+        width: calc(100% - 100px);
+        max-width: 400px;
+        max-height: 400px;
+        overflow: auto;
+      }
+      #searchSuggestion li {
+        cursor: pointer;
+      }
+      #searchSuggestion li:hover {
+        background-color: #ccc;
+      }
+      #searchHistory li {
+        justify-content: space-between;
+        padding: 10px;
+      }
+
+      #delete-button {
+        position: relative;
+        appearance: none;
+        background-color: orange;
+        border: 1px solid grey;
+        font-size: 30px;
+        font-weight: bolder;
+        height: 70px;
+        line-height: 70px;
+        padding-right: 80px;
+      }
+
+      #delete-button::after {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        content: "x";
+        font-weight: normal;
+        font-size: 50px;
+        line-height: 50px;
+        background-color: white;
+        border-radius: 100px;
+        width: 60px;
+        height: 60px;
+      }
+    </style>
+  </head>
+  <body>
+    <input
+      id="search"
+      name="search"
+      type="search"
+      onkeyup="onSearchRepositories(this)"
+      onblur="hideSuggestion()"
+    />
+    <ul id="searchSuggestion"></ul>
+    <h1>Search history</h1>
+    <a href="#" onclick="onClearHistory(event)">Clear history</a>
+    <ul id="searchHistory"></ul>
+
+    <button id="delete-button">
+      Delete
+    </button>
+
+    <script>
+      function showSuggestion() {
+        document.getElementById("searchSuggestion").style.display = "block";
+      }
+
+      function hideSuggestion() {
+        setTimeout(
+          () =>
+            (document.getElementById("searchSuggestion").style.display =
+              "none"),
+          400
+        );
+      }
+
+      function getRepositories(query) {
+        const apiUrl =
+          "https://api.github.com/search/repositories?q=" +
+          encodeURIComponent(query);
+        return fetch(apiUrl)
+          .then(response => response.json())
+          .then(json => json.items.map(item => item.name).sort());
+      }
+
+      function onClearHistory(event) {
+        event.preventDefault();
+        localStorage.setItem("history", []);
+        listHistory();
+      }
+
+      function getHistory() {
+        try {
+          const json = JSON.parse(localStorage.getItem("history"));
+          if (Array.isArray(json)) {
+            return json;
+          }
+        } catch (e) {}
+        return [];
+      }
+
+      function saveHistory(title) {
+        const history = getHistory();
+        history.push({
+          title,
+          date: Date.now()
+        });
+        localStorage.setItem("history", JSON.stringify(history));
+
+        listHistory();
+      }
+
+      function listHistory() {
+        const histories = getHistory();
+        const ul = histories.reduce((prev, curr) => {
+          const li = document.createElement("li");
+          li.onclick = () => {
+            saveHistory(curr);
+          };
+          const titleSpan = document.createElement("span");
+          titleSpan.innerText = curr.title;
+          const timeSpan = document.createElement("span");
+          timeSpan.innerText =
+            new Date(curr.date).toLocaleDateString() +
+            " " +
+            new Date(curr.date).toLocaleTimeString();
+          li.append(titleSpan);
+          li.append(timeSpan);
+          prev.append(li);
+          return prev;
+        }, document.createElement("ul"));
+        ul.id = "searchHistory";
+
+        const suggestionElement = document.getElementById("searchHistory");
+        suggestionElement.replaceWith(ul);
+      }
+      listHistory();
+
+      async function onSearchRepositories(node) {
+        try {
+          const repositories = await getRepositories(node.value);
+          const ul = repositories.reduce((prev, curr) => {
+            const li = document.createElement("li");
+            li.onclick = () => {
+              saveHistory(curr);
+            };
+            li.innerText = curr;
+            prev.append(li);
+            return prev;
+          }, document.createElement("ul"));
+          ul.id = "searchSuggestion";
+
+          const suggestionElement = document.getElementById("searchSuggestion");
+          suggestionElement.replaceWith(ul);
+          showSuggestion();
+        } catch (e) {
+          console.error("Service unavailable");
+        }
+      }
+    </script>
+  </body>
+</html>
